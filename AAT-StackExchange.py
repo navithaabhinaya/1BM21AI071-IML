@@ -1,72 +1,43 @@
 #Stack Exchange
 # Enter your code here. Read input from STDIN. Print output to STDOUT
-def getTrainingData():
-    import pandas as pd
+import json, sys
+from sklearn.svm import LinearSVC
+from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.preprocessing import LabelEncoder
 
-    data = open("trainingdata.txt").read().split("\n")
+if sys.version_info[0] >= 3:
+    raw_input = input
 
-    labels, texts = [], []
-    n, data = int(data[0]), data[1:]
+transformer = HashingVectorizer(stop_words='english')
+label_encoder = LabelEncoder()
 
-    for line in range(n):
-        labels.append(int(data[line][0]))
-        texts.append(data[line][2:])
+_train = []
+train_label = []
+f = open('training.json')
 
-    return pd.DataFrame({"text": texts, "label": labels})
+for i in range(int(f.readline())):
+    h = json.loads(f.readline())
+    _train.append(h['question'] + "\r\n" + h['excerpt'])
+    train_label.append(h['topic'])
 
+f.close()
 
-def examples():
-    dict_kn = {
-        "This is a document": 1,
-        "this is another document": 4,
-        "documents are seperated by newlines": 8,
-        "Business means risk": 1,
-        "They wanted to know how the disbursed": 1,
-    }
+# Convert text labels to numerical labels
+train_label = label_encoder.fit_transform(train_label)
 
-    return dict_kn
+train = transformer.fit_transform(_train)
+svm = LinearSVC()
+svm.fit(train, train_label)
 
+_test = []
+for i in range(int(raw_input())):
+    h = json.loads(raw_input())
+    _test.append(h['question'] + "\r\n" + h['excerpt'])
 
-def another_sol(x_test):
-    from sklearn.pipeline import Pipeline
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.linear_model import SGDClassifier
+test = transformer.transform(_test)
+test_label = svm.predict(test)
 
-    data = getTrainingData()
-    x_train, y_train = data.text, data.label
-
-    clf = Pipeline(
-        [
-            (
-                "vect",
-                TfidfVectorizer(
-                    stop_words="english",
-                    ngram_range=(1, 1),
-                    min_df=4,
-                    strip_accents="ascii",
-                    lowercase=True,
-                ),
-            ),
-            ("clf", SGDClassifier(class_weight="balanced")),
-        ]
-    )
-
-    clf.fit(x_train, y_train)
-
-    return clf.predict(x_test)
-
-
-if __name__ == "__main__":
-
-    n = int(input())
-    x_test = []
-    for i in range(n):
-        x_test.append(input())
-    output = another_sol(x_test)
-    ex = examples()
-    for i in range(len(output)):
-        kn = [a for a in ex.keys() if a in x_test[i]]
-        if len(kn) > 0:
-            print(ex[kn[0]])
-        else:
-            print(output[i])
+# Convert numerical labels back to text labels before printing
+test_label_text = label_encoder.inverse_transform(test_label)
+for e in test_label_text:
+    print(e)
